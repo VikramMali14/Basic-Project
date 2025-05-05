@@ -5,50 +5,78 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Server {
 
     // Initialize socket and input stream
     private Socket s = null;
     private ServerSocket ss = null;
-    private DataInputStream in = null;
-
+    static List<ClientHandler> all_clients=new ArrayList<>();
+    static Map<String,ClientHandler> user=new HashMap<>();
     // Constructor with port
     public Server(int port) {
-
-        // Starts server and waits for a connection
         try {
             ss = new ServerSocket(port);
-            System.out.println("Server started");
-
-            System.out.println("Waiting for a client ...");
-
-            s = ss.accept();
-            System.out.println("Client accepted");
-
-            // Takes input from the client socket
-            in = new DataInputStream(
-                    new BufferedInputStream(s.getInputStream()));
-
-            String m = "";
-
-            // Reads message from client until "Over" is sent
-            while (!m.equals("Over")) {
-                try {
-                    m = in.readUTF();
-                    System.out.println(m);
-
-                } catch (IOException i) {
-                    System.out.println(i);
-                }
-            }
-            System.out.println("Closing connection");
-
-            // Close connection
-            s.close();
-            in.close();
-        } catch (IOException i) {
-            System.out.println(i);
+           while(true){
+            s=ss.accept();
+            ClientHandler a=new ClientHandler(s);
+            all_clients.add(a);
+               try{
+                   DataInputStream in=new DataInputStream(s.getInputStream());
+               String me=in.readUTF();
+               user.put(me,a);
+               }
+               catch (IOException e){
+                   System.out.println(e);
+               }
+            a.start();
+               System.out.println(user.toString());
         }
-    }
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+}
+
+private class ClientHandler extends Thread{
+     Socket Client_Socket;
+    private DataInputStream in = null;
+    private DataOutputStream out=null;
+     public ClientHandler(Socket s){
+         Client_Socket=s;
+            try{
+                in=new DataInputStream(Client_Socket.getInputStream());
+                out=new DataOutputStream(Client_Socket.getOutputStream());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+     }
+     @Override
+     public void run(){
+         try {
+             while (true){
+                 String message=in.readUTF();
+                 broadcst(message,this);
+             }
+         } catch (IOException e) {
+             System.out.println(e);
+
+         }
+     }
+     void broadcst(String msg,ClientHandler s){
+         for(ClientHandler a:all_clients){
+             if(a!=s){
+                 try {
+                     a.out.writeUTF(msg);
+                 } catch (IOException e) {
+                     System.out.println(e);
+                 }
+             }
+         }
+     }
+}
 }
